@@ -44,7 +44,7 @@ export default function DashboardScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Good morning! 👋</Text>
-          <Text style={styles.subtitle}>Here's your business overview</Text>
+          <Text style={styles.subtitle}>Here-s your business overview</Text>
         </View>
         <TouchableOpacity
           style={styles.profileButton}
@@ -80,8 +80,8 @@ export default function DashboardScreen() {
         <Card variant="elevated" style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Contacts</Text>
-            <TouchableOpacity onPress={() => router.push("/(tabs)/index")}>
-              <Text style={styles.seeAll}>View All</Text>
+            <TouchableOpacity onPress={() => router.push("/")}>
+              <Text style={styles.seeAll}>View More</Text>
             </TouchableOpacity>
           </View>
 

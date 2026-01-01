@@ -10,15 +10,7 @@ export const QuickResponsesFooter = () => {
 
   return (
     <TouchableOpacity style={styles.container} activeOpacity={0.8}>
-      <LinearGradient
-        colors={["#4facfe", "#af40ff"]}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={styles.gradient}
-      >
-        <Ionicons name="send" size={18} color="#fff" style={styles.icon} />
-        <Text style={styles.text}>QUICK RESPONSES</Text>
-      </LinearGradient>
+     
     </TouchableOpacity>
   );
 };
