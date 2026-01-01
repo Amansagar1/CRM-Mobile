@@ -1,6 +1,5 @@
 import { useTheme } from "@/context/ThemeContext";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
+
 import React, { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity } from "react-native";
 
