@@ -1,9 +1,12 @@
 import { Spacing, Typography } from "@/constants/theme";
 import { useTheme } from "@/context/ThemeContext";
-import { mockContacts, mockMetrics } from "@/data/mockData";
+import { mockMetrics } from "@/data/mockData";
+import { contactService } from "@/services/api/contact.service";
+import type { Contact } from "@/types/crm";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+
 import {
   RefreshControl,
   SafeAreaView,
@@ -22,16 +25,46 @@ import { StatCard } from "@/components/ui/StatCard";
 export default function DashboardScreen() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
-  const [refreshing, setRefreshing] = React.useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [recentContacts, setRecentContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+  const fetchRecentContacts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await contactService.getContacts(1, 5);
+
+      let contactsArray: any[] = [];
+      if (Array.isArray(response.data?.data)) {
+        contactsArray = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        contactsArray = response.data;
+      } else if (Array.isArray(response)) {
+        contactsArray = response;
+      }
+
+      const mapped = contactsArray.map((item) =>
+        contactService.mapToContact(item)
+      );
+      setRecentContacts(mapped);
+    } catch (error) {
+      console.error("Dashboard fetch error:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, []);
 
-  const recentContacts = mockContacts.slice(0, 5);
+  useEffect(() => {
+    fetchRecentContacts();
+  }, [fetchRecentContacts]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchRecentContacts();
+  }, [fetchRecentContacts]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -50,7 +83,11 @@ export default function DashboardScreen() {
           style={styles.profileButton}
           onPress={() => router.push("/profile")}
         >
-          <Ionicons name="person-circle" size={40} color="#FFFFFF" />
+          <Avatar
+            name="User"
+            imageUrl={require("../../public/images/logo.png")}
+            size="sm"
+          />
         </TouchableOpacity>
       </View>
 
@@ -85,29 +122,41 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
 
-          {recentContacts.map((contact) => (
-            <TouchableOpacity
-              key={contact.id}
-              style={styles.contactItem}
-              onPress={() => router.push(`/contact-detail?id=${contact.id}`)}
-            >
-              <Avatar
-                name={`${contact.firstName} ${contact.lastName}`}
-                size="md"
-              />
-              <View style={styles.contactInfo}>
-                <Text style={styles.contactName}>
-                  {contact.firstName} {contact.lastName}
-                </Text>
-                <Text style={styles.contactCompany}>{contact.company}</Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={theme.textTertiary}
-              />
-            </TouchableOpacity>
-          ))}
+          {loading && !refreshing ? (
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <Text style={{ color: theme.textSecondary }}>Loading...</Text>
+            </View>
+          ) : recentContacts.length > 0 ? (
+            recentContacts.map((contact) => (
+              <TouchableOpacity
+                key={contact.id}
+                style={styles.contactItem}
+                onPress={() => router.push(`/contact-detail?id=${contact.id}`)}
+              >
+                <Avatar
+                  name={`${contact.firstName} ${contact.lastName}`}
+                  size="md"
+                />
+                <View style={styles.contactInfo}>
+                  <Text style={styles.contactName}>
+                    {contact.firstName} {contact.lastName}
+                  </Text>
+                  <Text style={styles.contactCompany}>{contact.company}</Text>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={theme.textTertiary}
+                />
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <Text style={{ color: theme.textTertiary }}>
+                No recent contacts
+              </Text>
+            </View>
+          )}
         </Card>
 
         {/* Quick Actions */}

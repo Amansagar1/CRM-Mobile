@@ -1,7 +1,14 @@
+import { ContactHeader } from "@/components/crm/ContactHeader";
+import { InfoSection } from "@/components/crm/InfoSection";
+import { QuickResponsesFooter } from "@/components/crm/QuickResponsesFooter";
+import { Timeline } from "@/components/crm/Timeline";
+import { Badge } from "@/components/ui/Badge";
 import { useTheme } from "@/context/ThemeContext";
+import { contactService } from "@/services/api/contact.service";
+import type { Contact } from "@/types/crm";
 import { Ionicons } from "@expo/vector-icons";
-import { Stack, useRouter } from "expo-router";
-import React, { useMemo } from "react";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   SafeAreaView,
   ScrollView,
@@ -11,15 +18,56 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { ContactHeader } from "../components/crm/ContactHeader";
-import { InfoSection } from "../components/crm/InfoSection";
-import { QuickResponsesFooter } from "../components/crm/QuickResponsesFooter";
-import { Timeline } from "../components/crm/Timeline";
 
 export default function ContactDetailScreen() {
   const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const { theme, isDark } = useTheme();
+  const [contact, setContact] = useState<Contact | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const styles = useMemo(() => createStyles(theme), [theme]);
+
+  useEffect(() => {
+    async function fetchDetail() {
+      if (!id) return;
+      try {
+        setLoading(true);
+        const data = await contactService.getContact(id);
+        setContact(data);
+      } catch (err: any) {
+        setError(err.message || "Failed to load contact");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchDetail();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <View style={[styles.safeArea, styles.center]}>
+        <Text style={{ color: theme.text }}>Loading details...</Text>
+      </View>
+    );
+  }
+
+  if (error || !contact) {
+    return (
+      <View style={[styles.safeArea, styles.center]}>
+        <Text style={{ color: theme.error }}>
+          {error || "Contact not found"}
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{ marginTop: 20 }}
+        >
+          <Text style={{ color: theme.primary }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -52,18 +100,26 @@ export default function ContactDetailScreen() {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        <ContactHeader name="Katherine Lim" />
+        <View style={styles.statusContainer}>
+          <Badge label={contact.status} variant={contact.status} size="sm" />
+        </View>
 
-        <InfoSection
-          title="FOLLOW UP"
-          content="3 days from now"
-          meta="31 Oct 2019"
+        <ContactHeader
+          name={`${contact.firstName} ${contact.lastName}`}
+          phone={contact.phone}
+          email={contact.email}
         />
 
         <InfoSection
-          title="NOTES"
-          content="Married with 2 kids, budget up to $2.5m. Looking at 3+ bedrooms, prefers high floors."
+          title="COMPANY"
+          content={contact.company || "No Company"}
         />
+
+        <InfoSection title="EMAIL" content={contact.email} />
+
+        <InfoSection title="PHONE" content={contact.phone} />
+
+        {contact.notes && <InfoSection title="NOTES" content={contact.notes} />}
 
         <Timeline />
 
@@ -113,6 +169,15 @@ const createStyles = (theme: any) =>
       color: "#FFFFFF",
       flex: 1,
       textAlign: "center",
+    },
+    center: {
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    statusContainer: {
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      backgroundColor: theme.background,
     },
     optionsLabel: {
       fontSize: 16,

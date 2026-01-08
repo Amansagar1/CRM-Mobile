@@ -1,31 +1,70 @@
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Colors, Spacing, Typography } from "@/constants/theme";
+import { BorderRadius, Colors, Spacing, Typography } from "@/constants/theme";
 import { useTheme } from "@/context/ThemeContext";
+import { authService } from "@/services/api/auth.service";
+import { User } from "@/types/auth.types";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+
 import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { theme, isDark, toggleTheme } = useTheme();
-  const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const handleLogout = () => {
-    router.replace("/login");
+  useEffect(() => {
+    async function fetchUser() {
+      try {
+        console.log("Profile: Fetching user data...");
+        const userData = await authService.getUser();
+        setUser(userData);
+      } catch (error) {
+        console.error("Error fetching user for profile:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchUser();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      console.log("Profile: Logout button pressed.");
+      await authService.logoutMutation();
+      console.log("Profile: Logout mutation completed, navigating to login.");
+      router.replace("/login");
+    } catch (error) {
+      console.error("Logout error in Profile UI:", error);
+    }
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView
+        style={[
+          styles.safeArea,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
+        <Text style={{ color: theme.text }}>Loading profile...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -33,111 +72,116 @@ export default function ProfileScreen() {
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
       >
-        {/* Profile Card */}
-        <Card variant="elevated" style={styles.profileCard}>
+        {/* Profile Card with Gradient */}
+        <LinearGradient
+          colors={["#F46C24", "#EA580C", "#C2410C"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.profileCard}
+        >
           <View style={styles.profileHeader}>
-            <Avatar name="John Doe" size="xxl" />
-            <TouchableOpacity style={styles.editAvatarButton}>
-              <Ionicons name="camera" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
+            <Avatar
+              name={user ? `${user.firstname} ${user.lastname}` : "User"}
+              imageUrl={require("../public/images/logo.png")}
+              size="xxl"
+              style={{ borderWidth: 4, borderColor: "#FFFFFF" }}
+            />
           </View>
 
-          <Text style={styles.profileName}>John Doe</Text>
-          <Text style={styles.profileEmail}>john.doe@company.com</Text>
-          <Text style={styles.profileRole}>Sales Manager</Text>
+          <Text style={styles.profileName}>
+            {user ? `${user.firstname} ${user.lastname}` : "Guest User"}
+          </Text>
+          <Text style={styles.profileEmail}>
+            {user?.email || "No email available"}
+          </Text>
+          <Text style={styles.profileRole}>
+            {user?.role ? user.role.toUpperCase().replace("_", " ") : "User"}
+          </Text>
+        </LinearGradient>
 
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Ionicons name="people" size={24} color={theme.primary} />
-              <Text style={styles.statValue}>247</Text>
-              <Text style={styles.statLabel}>Contacts</Text>
+        {/* Details Card */}
+        <Card variant="elevated" style={styles.section}>
+          <Text style={styles.sectionTitle}>Personal Information</Text>
+
+          <View style={styles.detailRow}>
+            <Ionicons
+              name="call-outline"
+              size={20}
+              color={theme.textSecondary}
+            />
+            <View style={styles.detailTextContainer}>
+              <Text style={styles.detailLabel}>Phone</Text>
+              <Text style={styles.detailValue}>
+                {user?.phone || "Not provided"}
+              </Text>
             </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Ionicons
-                name="briefcase"
-                size={24}
-                color={Colors.success[500]}
-              />
-              <Text style={styles.statValue}>18</Text>
-              <Text style={styles.statLabel}>Active Deals</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Ionicons name="trophy" size={24} color={Colors.warning[500]} />
-              <Text style={styles.statValue}>85%</Text>
-              <Text style={styles.statLabel}>Win Rate</Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Ionicons
+              name="finger-print-outline"
+              size={20}
+              color={theme.textSecondary}
+            />
+            <View style={styles.detailTextContainer}>
+              <Text style={styles.detailLabel}>User ID</Text>
+              <Text style={[styles.detailValue, { fontSize: 12 }]}>
+                {user?.id}
+              </Text>
             </View>
           </View>
         </Card>
 
-        {/* Account Settings */}
+        {/* Org & Permissions Card */}
         <Card variant="elevated" style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Settings</Text>
+          <Text style={styles.sectionTitle}>Access & Scope</Text>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuLeft}>
-              <Ionicons name="person-outline" size={24} color={theme.text} />
-              <Text style={styles.menuLabel}>Edit Profile</Text>
-            </View>
+          <View style={styles.detailRow}>
             <Ionicons
-              name="chevron-forward"
+              name="business-outline"
               size={20}
-              color={theme.textTertiary}
+              color={theme.textSecondary}
             />
-          </TouchableOpacity>
+            <View style={styles.detailTextContainer}>
+              <Text style={styles.detailLabel}>Organizations</Text>
+              <Text style={styles.detailValue}>
+                {user?.org && user.org.length > 0
+                  ? user.org.join(", ")
+                  : "None"}
+              </Text>
+            </View>
+          </View>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuLeft}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={24}
-                color={theme.text}
-              />
-              <Text style={styles.menuLabel}>Change Password</Text>
-            </View>
+          <View style={styles.detailRow}>
             <Ionicons
-              name="chevron-forward"
+              name="shield-checkmark-outline"
               size={20}
-              color={theme.textTertiary}
+              color={theme.textSecondary}
             />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuLeft}>
-              <Ionicons name="mail-outline" size={24} color={theme.text} />
-              <Text style={styles.menuLabel}>Email Preferences</Text>
+            <View style={styles.detailTextContainer}>
+              <Text style={styles.detailLabel}>Permissions</Text>
+              <View style={styles.permissionsGrid}>
+                {user?.permissions &&
+                  Object.entries(user.permissions).map(([key, value]) => (
+                    <View key={key} style={styles.permissionBadge}>
+                      <Ionicons
+                        name={value ? "checkmark-circle" : "close-circle"}
+                        size={14}
+                        color={value ? Colors.success[500] : "#f44336"}
+                      />
+                      <Text style={styles.permissionText}>
+                        {key.replace("_", " ")}
+                      </Text>
+                    </View>
+                  ))}
+              </View>
             </View>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={theme.textTertiary}
-            />
-          </TouchableOpacity>
+          </View>
         </Card>
 
         {/* App Settings */}
         <Card variant="elevated" style={styles.section}>
-          <Text style={styles.sectionTitle}>App Settings</Text>
-
-          <View style={styles.menuItem}>
-            <View style={styles.menuLeft}>
-              <Ionicons
-                name="notifications-outline"
-                size={24}
-                color={theme.text}
-              />
-              <Text style={styles.menuLabel}>Notifications</Text>
-            </View>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
-              trackColor={{
-                false: theme.border,
-                true: theme.primary,
-              }}
-            />
-          </View>
+          <Text style={styles.sectionTitle}>Settings</Text>
 
           <View style={styles.menuItem}>
             <View style={styles.menuLeft}>
@@ -153,81 +197,6 @@ export default function ProfileScreen() {
               }}
             />
           </View>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuLeft}>
-              <Ionicons name="language-outline" size={24} color={theme.text} />
-              <Text style={styles.menuLabel}>Language</Text>
-            </View>
-            <View style={styles.menuRight}>
-              <Text style={[styles.menuValue, { color: theme.textSecondary }]}>
-                English
-              </Text>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={theme.textTertiary}
-              />
-            </View>
-          </TouchableOpacity>
-        </Card>
-
-        {/* Support */}
-        <Card variant="elevated" style={styles.section}>
-          <Text style={styles.sectionTitle}>Support</Text>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuLeft}>
-              <Ionicons
-                name="help-circle-outline"
-                size={24}
-                color={theme.text}
-              />
-              <Text style={styles.menuLabel}>Help Center</Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={theme.textTertiary}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuLeft}>
-              <Ionicons
-                name="shield-checkmark-outline"
-                size={24}
-                color={theme.text}
-              />
-              <Text style={styles.menuLabel}>Privacy Policy</Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={theme.textTertiary}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuLeft}>
-              <Ionicons
-                name="information-circle-outline"
-                size={24}
-                color={theme.text}
-              />
-              <Text style={styles.menuLabel}>About</Text>
-            </View>
-            <View style={styles.menuRight}>
-              <Text style={[styles.menuValue, { color: theme.textSecondary }]}>
-                v1.0.0
-              </Text>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={theme.textTertiary}
-              />
-            </View>
-          </TouchableOpacity>
         </Card>
 
         {/* Logout Button */}
@@ -248,7 +217,7 @@ const createStyles = (theme: any) =>
   StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: theme.background,
+      backgroundColor: theme.backgroundSecondary,
     },
     header: {
       flexDirection: "row",
@@ -278,6 +247,12 @@ const createStyles = (theme: any) =>
       alignItems: "center",
       paddingVertical: Spacing.xl,
       marginBottom: Spacing.xl,
+      borderRadius: BorderRadius.xl,
+      elevation: 8,
+      shadowColor: "#F46C24",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
     },
     profileHeader: {
       position: "relative",
@@ -299,17 +274,17 @@ const createStyles = (theme: any) =>
     profileName: {
       fontSize: Typography.fontSize.xxxl,
       fontWeight: Typography.fontWeight.bold,
-      color: theme.text,
+      color: "#FFFFFF",
       marginBottom: Spacing.xs,
     },
     profileEmail: {
       fontSize: Typography.fontSize.base,
-      color: theme.textSecondary,
+      color: "rgba(255, 255, 255, 0.9)",
       marginBottom: 2,
     },
     profileRole: {
       fontSize: Typography.fontSize.sm,
-      color: theme.textTertiary,
+      color: "rgba(255, 255, 255, 0.7)",
       marginBottom: Spacing.xl,
     },
     statsRow: {
@@ -378,5 +353,47 @@ const createStyles = (theme: any) =>
     },
     logoutButton: {
       marginTop: Spacing.xl,
+    },
+    detailRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: Spacing.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    detailTextContainer: {
+      marginLeft: Spacing.md,
+      flex: 1,
+    },
+    detailLabel: {
+      fontSize: Typography.fontSize.xs,
+      color: theme.textTertiary,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+    detailValue: {
+      fontSize: Typography.fontSize.base,
+      color: theme.text,
+      marginTop: 2,
+    },
+    permissionsGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: Spacing.sm,
+      marginTop: Spacing.xs,
+    },
+    permissionBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.backgroundTertiary,
+      paddingHorizontal: Spacing.sm,
+      paddingVertical: 4,
+      borderRadius: BorderRadius.full,
+      gap: 4,
+    },
+    permissionText: {
+      fontSize: Typography.fontSize.xs,
+      color: theme.textSecondary,
+      textTransform: "capitalize",
     },
   });

@@ -59,6 +59,7 @@ export function SearchBar({
 const createStyles = (theme: any) =>
   StyleSheet.create({
     container: {
+      marginTop: Spacing.md,
       flexDirection: "row",
       alignItems: "center",
       backgroundColor: theme.backgroundSecondary,

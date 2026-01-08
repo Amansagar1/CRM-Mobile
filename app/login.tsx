@@ -1,10 +1,13 @@
 import { Button } from "@/components/ui/Button";
 import { BorderRadius, Shadows, Spacing, Typography } from "@/constants/theme";
 import { useTheme } from "@/context/ThemeContext";
+import { authService } from "@/services/api";
+import { ApiError } from "@/types/auth.types";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
@@ -22,12 +25,71 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string>("");
 
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const handleLogin = () => {
-    // In real app, validate credentials
-    router.replace("/(tabs)/dashboard");
+  const handleLogin = async () => {
+    // Clear previous errors
+    setError("");
+
+    // Validate inputs
+    if (!email.trim()) {
+      setError("Please enter your email address");
+      return;
+    }
+
+    if (!password.trim()) {
+      setError("Please enter your password");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      console.log("Attempting login with:", { email: email.trim() });
+
+      const response = await authService.loginMutation({
+        email: email.trim(),
+        password: password.trim(),
+      });
+
+      console.log("Login response:", response);
+
+      // Check if we got a valid user response (has id field)
+      if (response && response.id) {
+        // Navigate to dashboard on successful login
+        router.replace("/(tabs)/dashboard");
+      } else {
+        console.log("Login failed - no user ID in response");
+        setError("Login failed. Please try again.");
+      }
+    } catch (err: any) {
+      console.error("Login error:", err);
+      const apiError = err as ApiError;
+      const errorMessage =
+        apiError.message || "An error occurred during login. Please try again.";
+      setError(errorMessage);
+
+      // Show alert for critical errors
+      if (apiError.status && apiError.status >= 500) {
+        Alert.alert(
+          "Server Error",
+          "Unable to connect to the server. Please try again later.",
+          [{ text: "OK" }]
+        );
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -121,13 +183,22 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* Error Message */}
+            {error ? (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={20} color="#EF4444" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+
             {/* Login Button */}
             <Button
-              title="Sign In"
+              title={isLoading ? "Signing In..." : "Sign In"}
               onPress={handleLogin}
               variant="primary"
               fullWidth
               style={styles.loginButton}
+              disabled={isLoading}
             />
 
             {/* Divider */}
@@ -135,19 +206,6 @@ export default function LoginScreen() {
               <View style={styles.dividerLine} />
               <Text style={styles.dividerText}>OR</Text>
               <View style={styles.dividerLine} />
-            </View>
-
-            {/* Social Login */}
-            <View style={styles.socialButtons}>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-google" size={24} color="#DB4437" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-apple" size={24} color="#000000" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-microsoft" size={24} color="#00A4EF" />
-              </TouchableOpacity>
             </View>
 
             {/* Sign Up Link */}
@@ -256,6 +314,21 @@ const createStyles = (theme: any) =>
       fontSize: Typography.fontSize.sm,
       color: theme.primary,
       fontWeight: Typography.fontWeight.semibold,
+    },
+    errorContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#FEE2E2",
+      borderRadius: BorderRadius.sm,
+      padding: Spacing.md,
+      marginBottom: Spacing.base,
+      gap: Spacing.xs,
+    },
+    errorText: {
+      flex: 1,
+      fontSize: Typography.fontSize.sm,
+      color: "#DC2626",
+      fontWeight: Typography.fontWeight.medium,
     },
     loginButton: {
       marginBottom: Spacing.xl,

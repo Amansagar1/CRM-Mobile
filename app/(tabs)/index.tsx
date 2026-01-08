@@ -5,12 +5,13 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { BorderRadius, Shadows, Spacing, Typography } from "@/constants/theme";
 import { useTheme } from "@/context/ThemeContext";
-import { mockContacts } from "@/data/mockData";
+import { contactService } from "@/services/api/contact.service";
 import type { Contact } from "@/types/crm";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Linking,
@@ -26,21 +27,104 @@ import {
 export default function ContactsScreen() {
   const router = useRouter();
   const { theme, isDark } = useTheme();
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 10;
 
   const styles = useMemo(() => createStyles(theme, isDark), [theme, isDark]);
 
-  const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+  const fetchContacts = useCallback(
+    async (targetPage = 1, isRefreshing = false) => {
+      try {
+        if (isRefreshing) {
+          setRefreshing(true);
+        } else if (targetPage === 1) {
+          setLoading(true);
+        } else {
+          setLoadingMore(true);
+        }
+        setError(null);
 
-  const filteredContacts = mockContacts.filter((contact) =>
+        const response = await contactService.getContacts(
+          targetPage,
+          PAGE_SIZE
+        );
+
+        // Map API response to Contact type
+        let contactsArray: any[] = [];
+
+        if (Array.isArray(response.data?.data)) {
+          contactsArray = response.data.data;
+        } else if (Array.isArray(response.data)) {
+          contactsArray = response.data;
+        } else if (Array.isArray(response)) {
+          contactsArray = response;
+        }
+
+        // Determine if there are more items
+        if (contactsArray.length < PAGE_SIZE) {
+          setHasMore(false);
+        } else {
+          setHasMore(true);
+        }
+
+        const mappedContacts: Contact[] = contactsArray.map((item: any) =>
+          contactService.mapToContact(item)
+        );
+
+        if (targetPage === 1) {
+          setContacts(mappedContacts);
+          setPage(1);
+        } else {
+          setContacts((prev) => [...prev, ...mappedContacts]);
+          setPage(targetPage);
+        }
+      } catch (err: any) {
+        setError(`DEBUG ERROR: ${err.message || String(err)}`);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    fetchContacts(1);
+  }, [fetchContacts]);
+
+  const onRefresh = React.useCallback(() => {
+    setHasMore(true);
+    fetchContacts(1, true);
+  }, [fetchContacts]);
+
+  const handleLoadMore = () => {
+    if (!loading && !loadingMore && hasMore && !searchQuery) {
+      fetchContacts(page + 1);
+    }
+  };
+
+  const filteredContacts = contacts.filter((contact) =>
     `${contact.firstName} ${contact.lastName} ${contact.email} ${contact.company}`
       .toLowerCase()
       .includes(searchQuery.toLowerCase())
   );
+
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={theme.primary} />
+      </View>
+    );
+  };
 
   // Helper functions to open native apps
   const handleCall = (phone: string) => {
@@ -184,7 +268,19 @@ export default function ContactsScreen() {
         />
 
         {/* Contacts List */}
-        {filteredContacts.length > 0 ? (
+        {loading && !refreshing ? (
+          <View style={styles.centerContainer}>
+            <Text style={styles.subtitle}>Loading contacts...</Text>
+          </View>
+        ) : error ? (
+          <EmptyState
+            icon="alert-circle-outline"
+            title="Contacts Update Error"
+            message={error}
+            actionLabel="Try Again"
+            onAction={() => fetchContacts()}
+          />
+        ) : filteredContacts.length > 0 ? (
           <FlatList
             data={filteredContacts}
             renderItem={renderContactCard}
@@ -194,6 +290,9 @@ export default function ContactsScreen() {
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={renderFooter}
           />
         ) : (
           <EmptyState
@@ -232,6 +331,11 @@ const createStyles = (theme: any, isDark: boolean) =>
     },
     container: {
       flex: 1,
+    },
+    centerContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
     },
     header: {
       flexDirection: "row",
@@ -368,5 +472,9 @@ const createStyles = (theme: any, isDark: boolean) =>
       alignItems: "center",
       justifyContent: "center",
       ...Shadows.lg,
+    },
+    footerLoader: {
+      paddingVertical: Spacing.md,
+      alignItems: "center",
     },
   });

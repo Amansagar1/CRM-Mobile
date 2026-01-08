@@ -39,15 +39,25 @@ const ActionButton = ({
   );
 };
 
-export const ContactHeader = ({ name }: { name: string }) => {
+export const ContactHeader = ({
+  name,
+  phone,
+  email,
+}: {
+  name: string;
+  phone: string;
+  email: string;
+}) => {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const handleCall = () => Linking.openURL("tel:+1234567890");
-  const handleSMS = () => Linking.openURL("sms:+1234567890");
-  const handleEmail = () => Linking.openURL("mailto:katherine@example.com");
-  const handleWhatsApp = () =>
-    Linking.openURL("whatsapp://send?phone=1234567890");
+  const handleCall = () => Linking.openURL(`tel:${phone}`);
+  const handleSMS = () => Linking.openURL(`sms:${phone}`);
+  const handleEmail = () => Linking.openURL(`mailto:${email}`);
+  const handleWhatsApp = () => {
+    const cleanPhone = phone.replace(/\D/g, "");
+    Linking.openURL(`whatsapp://send?phone=${cleanPhone}`);
+  };
 
   return (
     <View style={styles.container}>

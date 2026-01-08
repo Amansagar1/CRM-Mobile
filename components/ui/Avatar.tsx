@@ -1,4 +1,5 @@
 import { Typography } from "@/constants/theme";
+import { Image } from "expo-image";
 import React from "react";
 import { StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 
@@ -22,13 +23,22 @@ export function Avatar({ name, imageUrl, size = "md", style }: AvatarProps) {
         {
           width: avatarSize,
           height: avatarSize,
-          backgroundColor,
+          backgroundColor: imageUrl ? "#FFFFFF" : backgroundColor,
           borderRadius: avatarSize / 2,
+          overflow: "hidden",
         },
         style,
       ]}
     >
-      <Text style={[styles.text, { fontSize }]}>{initials}</Text>
+      {imageUrl ? (
+        <Image
+          source={imageUrl}
+          style={{ width: "100%", height: "100%" }}
+          contentFit="contain"
+        />
+      ) : (
+        <Text style={[styles.text, { fontSize }]}>{initials}</Text>
+      )}
     </View>
   );
 }
